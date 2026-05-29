@@ -1,12 +1,15 @@
 use std::io::Result;
 
-use log::{info, trace};
+use log::info;
 use tokio::{
     join, runtime,
-    sync::mpsc::{self, UnboundedReceiver},
+    sync::mpsc::{self},
 };
 
-use crate::transport::{InputTransport, lan::LanInputTransport, models::InputMessage};
+use crate::{
+    transport::{InputTransport, lan::LanInputTransport, models::InputMessage},
+    virt::gamepad::GamepadManager,
+};
 
 pub struct Server {}
 
@@ -20,18 +23,13 @@ impl Server {
         let tk_handle = runtime::Handle::current();
         let (input_sender, mut input_receiver) = mpsc::unbounded_channel::<InputMessage>();
         let lan_transport = LanInputTransport::new(tk_handle);
+        let mut gamepad_manager = GamepadManager::new();
         info!("Server started successfully");
         join!(
             lan_transport.run(input_sender),
-            Self::read_input_signals(&mut input_receiver)
+            gamepad_manager.manage(&mut input_receiver)
         );
 
         Ok(())
-    }
-
-    async fn read_input_signals(input_receiver: &mut UnboundedReceiver<InputMessage>) {
-        while let Some(msg) = input_receiver.recv().await {
-            trace!("Signal received: {:?}", msg.signal);
-        }
     }
 }

@@ -70,7 +70,7 @@ impl Display for InputSignalError {
 
 impl Error for InputSignalError {}
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ClientId {
     Network(IpAddr),
 }
