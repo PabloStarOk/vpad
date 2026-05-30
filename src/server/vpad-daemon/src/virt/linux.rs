@@ -7,9 +7,9 @@ use evdev_rs::{
 
 use crate::{
     transport::models::{
-        Axis, Button, InputSignal,
-        InputType::{self},
-        Trigger,
+        Button,
+        InputSignal::{self},
+        Side,
     },
     virt::constants,
 };
@@ -58,34 +58,15 @@ impl LinuxVirtualGamepad {
     }
 
     pub fn report_input(&mut self, signal: InputSignal) -> Result<()> {
-        let event_code = match signal.itype {
-            InputType::Button(button) => match button {
-                Button::South => EventCode::EV_KEY(EV_KEY::BTN_SOUTH),
-                Button::North => EventCode::EV_KEY(EV_KEY::BTN_NORTH),
-                Button::West => EventCode::EV_KEY(EV_KEY::BTN_WEST),
-                Button::East => EventCode::EV_KEY(EV_KEY::BTN_EAST),
-                Button::LeftBumper => EventCode::EV_KEY(EV_KEY::BTN_TL),
-                Button::RightBumper => EventCode::EV_KEY(EV_KEY::BTN_TR),
-                Button::LeftStick => EventCode::EV_KEY(EV_KEY::BTN_THUMBL),
-                Button::RightStick => EventCode::EV_KEY(EV_KEY::BTN_THUMBR),
-                Button::Select => EventCode::EV_KEY(EV_KEY::BTN_SELECT),
-                Button::Start => EventCode::EV_KEY(EV_KEY::BTN_START),
-                Button::DPadDown | Button::DPadUp | Button::DPadLeft | Button::DPadRight => {
-                    return self.report_dpad_input(signal);
-                }
-            },
-            InputType::LeftStick(Axis::X) => EventCode::EV_ABS(EV_ABS::ABS_X),
-            InputType::LeftStick(Axis::Y) => EventCode::EV_ABS(EV_ABS::ABS_Y),
-            InputType::RightStick(Axis::X) => EventCode::EV_ABS(EV_ABS::ABS_RX),
-            InputType::RightStick(Axis::Y) => EventCode::EV_ABS(EV_ABS::ABS_RY),
-            InputType::Trigger(Trigger::Left) => EventCode::EV_ABS(EV_ABS::ABS_Z),
-            InputType::Trigger(Trigger::Right) => EventCode::EV_ABS(EV_ABS::ABS_RZ),
-        };
-
-        let event = InputEvent::new(&Self::ZERO_TIME_VAL, &event_code, signal.value as i32);
-        self.virtual_dev.write_event(&event)?;
-        self.virtual_dev.write_event(&Self::SYN_REPORT_EVENT)?;
-        Ok(())
+        match signal {
+            InputSignal::Button { code, pressed } => self.report_btn_input(code, pressed),
+            InputSignal::Stick {
+                side,
+                x_value,
+                y_value,
+            } => self.report_stick_input(side, x_value, y_value),
+            InputSignal::Trigger { side, value } => self.report_trigger_input(side, value),
+        }
     }
 
     fn enable_events(uninit_dev: &UninitDevice) -> Result<()> {
@@ -162,34 +143,57 @@ impl LinuxVirtualGamepad {
         Ok(())
     }
 
-    fn report_dpad_input(&mut self, signal: InputSignal) -> Result<()> {
-        let (abs_event_code, btn_event_code, value) = match signal.itype {
-            InputType::Button(Button::DPadUp) => {
-                self.dpad_state.up = signal.value == 1;
+    fn report_btn_input(&mut self, btn: Button, value: u8) -> Result<()> {
+        let event_code = match btn {
+            Button::South => EventCode::EV_KEY(EV_KEY::BTN_SOUTH),
+            Button::North => EventCode::EV_KEY(EV_KEY::BTN_NORTH),
+            Button::West => EventCode::EV_KEY(EV_KEY::BTN_WEST),
+            Button::East => EventCode::EV_KEY(EV_KEY::BTN_EAST),
+            Button::LeftBumper => EventCode::EV_KEY(EV_KEY::BTN_TL),
+            Button::RightBumper => EventCode::EV_KEY(EV_KEY::BTN_TR),
+            Button::LeftStick => EventCode::EV_KEY(EV_KEY::BTN_THUMBL),
+            Button::RightStick => EventCode::EV_KEY(EV_KEY::BTN_THUMBR),
+            Button::Select => EventCode::EV_KEY(EV_KEY::BTN_SELECT),
+            Button::Start => EventCode::EV_KEY(EV_KEY::BTN_START),
+            Button::DPadDown | Button::DPadUp | Button::DPadLeft | Button::DPadRight => {
+                return self.report_dpad_input(btn, value);
+            }
+        };
+
+        let event = InputEvent::new(&Self::ZERO_TIME_VAL, &event_code, value as i32);
+        self.virtual_dev.write_event(&event)?;
+        self.virtual_dev.write_event(&Self::SYN_REPORT_EVENT)?;
+        Ok(())
+    }
+
+    fn report_dpad_input(&mut self, btn: Button, value: u8) -> Result<()> {
+        let (abs_event_code, btn_event_code, value) = match btn {
+            Button::DPadUp => {
+                self.dpad_state.up = value == 1;
                 (
                     EventCode::EV_ABS(EV_ABS::ABS_HAT0Y),
                     EventCode::EV_KEY(EV_KEY::BTN_DPAD_UP),
                     Self::compute_dpad_axis(self.dpad_state.up, self.dpad_state.down),
                 )
             }
-            InputType::Button(Button::DPadDown) => {
-                self.dpad_state.down = signal.value == 1;
+            Button::DPadDown => {
+                self.dpad_state.down = value == 1;
                 (
                     EventCode::EV_ABS(EV_ABS::ABS_HAT0Y),
                     EventCode::EV_KEY(EV_KEY::BTN_DPAD_DOWN),
                     Self::compute_dpad_axis(self.dpad_state.up, self.dpad_state.down),
                 )
             }
-            InputType::Button(Button::DPadLeft) => {
-                self.dpad_state.left = signal.value == 1;
+            Button::DPadLeft => {
+                self.dpad_state.left = value == 1;
                 (
                     EventCode::EV_ABS(EV_ABS::ABS_HAT0X),
                     EventCode::EV_KEY(EV_KEY::BTN_DPAD_LEFT),
                     Self::compute_dpad_axis(self.dpad_state.left, self.dpad_state.right),
                 )
             }
-            InputType::Button(Button::DPadRight) => {
-                self.dpad_state.right = signal.value == 1;
+            Button::DPadRight => {
+                self.dpad_state.right = value == 1;
                 (
                     EventCode::EV_ABS(EV_ABS::ABS_HAT0X),
                     EventCode::EV_KEY(EV_KEY::BTN_DPAD_RIGHT),
@@ -200,9 +204,41 @@ impl LinuxVirtualGamepad {
         };
 
         let abs_event = InputEvent::new(&Self::ZERO_TIME_VAL, &abs_event_code, value as i32);
-        let btn_event = InputEvent::new(&Self::ZERO_TIME_VAL, &btn_event_code, signal.value as i32);
+        let btn_event = InputEvent::new(&Self::ZERO_TIME_VAL, &btn_event_code, value as i32);
         self.virtual_dev.write_event(&abs_event)?;
         self.virtual_dev.write_event(&btn_event)?;
+        self.virtual_dev.write_event(&Self::SYN_REPORT_EVENT)?;
+        Ok(())
+    }
+
+    fn report_stick_input(&mut self, side: Side, x_value: i16, y_value: i16) -> Result<()> {
+        let (x_code, y_code) = match side {
+            Side::Left => (
+                EventCode::EV_ABS(EV_ABS::ABS_X),
+                EventCode::EV_ABS(EV_ABS::ABS_Y),
+            ),
+            Side::Right => (
+                EventCode::EV_ABS(EV_ABS::ABS_RX),
+                EventCode::EV_ABS(EV_ABS::ABS_RY),
+            ),
+        };
+
+        let x_event = InputEvent::new(&Self::ZERO_TIME_VAL, &x_code, x_value as i32);
+        let y_event = InputEvent::new(&Self::ZERO_TIME_VAL, &y_code, y_value as i32);
+        self.virtual_dev.write_event(&x_event)?;
+        self.virtual_dev.write_event(&y_event)?;
+        self.virtual_dev.write_event(&Self::SYN_REPORT_EVENT)?;
+        Ok(())
+    }
+
+    fn report_trigger_input(&mut self, side: Side, value: u8) -> Result<()> {
+        let event_code = match side {
+            Side::Left => EventCode::EV_ABS(EV_ABS::ABS_Z),
+            Side::Right => EventCode::EV_ABS(EV_ABS::ABS_RZ),
+        };
+
+        let event = InputEvent::new(&Self::ZERO_TIME_VAL, &event_code, value as i32);
+        self.virtual_dev.write_event(&event)?;
         self.virtual_dev.write_event(&Self::SYN_REPORT_EVENT)?;
         Ok(())
     }

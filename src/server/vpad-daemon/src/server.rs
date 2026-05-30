@@ -7,7 +7,7 @@ use tokio::{
 };
 
 use crate::{
-    transport::{InputTransport, lan::LanInputTransport, models::InputMessage},
+    transport::{InputTransport, lan::LanInputTransport, models::VpadPacket},
     virt::gamepad::GamepadManager,
 };
 
@@ -21,7 +21,7 @@ impl Server {
     pub async fn run(&self) -> Result<()> {
         env_logger::init();
         let tk_handle = runtime::Handle::current();
-        let (input_sender, mut input_receiver) = mpsc::unbounded_channel::<InputMessage>();
+        let (input_sender, mut input_receiver) = mpsc::unbounded_channel::<VpadPacket>();
         let lan_transport = LanInputTransport::new(tk_handle);
         let mut gamepad_manager = GamepadManager::new();
         info!("Server started successfully");

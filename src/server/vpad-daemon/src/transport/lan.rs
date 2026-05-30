@@ -7,7 +7,7 @@ use tokio::{net::UdpSocket, runtime::Handle, sync::mpsc::UnboundedSender};
 
 use crate::transport::{
     InputTransport,
-    models::{ClientId, InputMessage, InputSignal},
+    models::{ClientId, Message, VpadPacket},
 };
 
 pub struct LanInputTransport {
@@ -25,8 +25,8 @@ impl LanInputTransport {
         LanInputTransport { tk_handle }
     }
 
-    async fn listen(socket: UdpSocket, input_sender: UnboundedSender<InputMessage>) {
-        let mut data_buf = [0; InputSignal::SIZE];
+    async fn listen(socket: UdpSocket, packet_sender: UnboundedSender<VpadPacket>) {
+        let mut data_buf = [0u8; Message::MAX_SIZE];
         loop {
             let addr = match socket.recv_from(&mut data_buf).await {
                 Ok((_, address)) => address,
@@ -38,27 +38,27 @@ impl LanInputTransport {
 
             trace!("Received UDP packet from {}.", addr.ip());
 
-            let input_signal = match InputSignal::try_from(&data_buf) {
-                Ok(signal) => signal,
+            let message = match Message::try_from(&data_buf) {
+                Ok(msg) => msg,
                 Err(error) => {
-                    error!("Could not create input signal from data of UDP packet: {error}");
+                    error!("Could not create message from data of UDP packet: {error}");
                     continue;
                 }
             };
 
-            let input_msg = InputMessage {
+            let packet = VpadPacket {
                 client_id: ClientId::Network(addr.ip()),
-                signal: input_signal,
+                message,
             };
-            input_sender
-                .send(input_msg)
-                .expect("Could not send input message on the unbounded channel.");
+            packet_sender
+                .send(packet)
+                .expect("Could not send message on the unbounded channel.");
         }
     }
 }
 
 impl InputTransport for LanInputTransport {
-    async fn run(&self, input_sender: UnboundedSender<InputMessage>) {
+    async fn run(&self, packet_sender: UnboundedSender<VpadPacket>) {
         let udp_socket = UdpSocket::bind(Self::SOCKET_ADDR)
             .await
             .expect("Could not bind UDP socket to the specified socket address.");
@@ -73,6 +73,6 @@ impl InputTransport for LanInputTransport {
         let _dmns_service =
             responder.register(Self::SERVICE_DOMAIN, Self::SERVICE_NAME, socket_port, &[]);
 
-        Self::listen(udp_socket, input_sender).await;
+        Self::listen(udp_socket, packet_sender).await;
     }
 }
