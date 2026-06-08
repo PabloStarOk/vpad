@@ -26,7 +26,7 @@ impl GamepadManager {
         }
     }
 
-    pub async fn manage(&mut self, packet_receiver: &mut UnboundedReceiver<VpadPacket>) {
+    pub async fn run(&mut self, packet_receiver: &mut UnboundedReceiver<VpadPacket>) {
         while let Some(packet) = packet_receiver.recv().await {
             trace!("Received VPad packet: {:?}", packet);
             match packet.message {

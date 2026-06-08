@@ -38,7 +38,7 @@ impl Server {
             _ = lan_transport.run(input_sender, &mut lan_output_receiver) => {
                 error!("LAN input transport stopped unexpectedly");
             },
-            _ = gamepad_manager.manage(&mut input_receiver) => {
+            _ = gamepad_manager.run(&mut input_receiver) => {
                 error!("Gamepad manager stopped unexpectedly");
             },
             _ = Self::wait_shutdown_signal() => {},
