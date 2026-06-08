@@ -40,8 +40,6 @@ impl Server {
     }
 
     pub async fn run(&mut self) -> Result<()> {
-        env_logger::init();
-
         info!("Server started successfully");
         select! {
             _ = self.lan_transport.run(&mut self.lan_server_packet_rx) => {
