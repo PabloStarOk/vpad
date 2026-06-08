@@ -112,7 +112,7 @@ impl Transport<SocketAddr> for LanTransport {
 
         let responder = Responder::spawn(&self.tk_handle)
             .expect("Could not create responder to register service to mDNS.");
-        let _dmns_service =
+        let _mdns_service =
             responder.register(Self::SERVICE_DOMAIN, Self::SERVICE_NAME, socket_port, &[]);
 
         join!(self.listen(), self.send(output_receiver));
