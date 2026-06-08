@@ -203,19 +203,19 @@ impl Display for MessageError {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Message {
+pub enum ClientMessage {
     Connection(ConnectionMessage),
     Input(InputSignal),
 }
 
-impl Message {
+impl ClientMessage {
     /// Max buffer size: 1 (msg_type) + 1 (input_type) + 1 (code) + 2 (X axis) + 2 (Y axis) = 7
     pub const MAX_SIZE: usize = 7;
     pub const CONNECTION: u8 = 0;
     pub const INPUT: u8 = 1;
 }
 
-impl TryFrom<&[u8; Self::MAX_SIZE]> for Message {
+impl TryFrom<&[u8; Self::MAX_SIZE]> for ClientMessage {
     type Error = MessageError;
 
     fn try_from(buffer: &[u8; Self::MAX_SIZE]) -> Result<Self, Self::Error> {
@@ -235,9 +235,9 @@ impl TryFrom<&[u8; Self::MAX_SIZE]> for Message {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct VpadPacket {
+pub struct ClientPacket {
     pub client_id: ClientId,
-    pub message: Message,
+    pub message: ClientMessage,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

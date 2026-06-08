@@ -10,7 +10,7 @@ use crate::{
     transport::{
         InputTransport,
         lan::LanInputTransport,
-        models::{ServerPacket, VpadPacket},
+        models::{ClientPacket, ServerPacket},
     },
     virt::gamepad::GamepadManager,
 };
@@ -26,7 +26,7 @@ impl Server {
         env_logger::init();
         let tk_handle = runtime::Handle::current();
 
-        let (input_sender, mut input_receiver) = mpsc::unbounded_channel::<VpadPacket>();
+        let (input_sender, mut input_receiver) = mpsc::unbounded_channel::<ClientPacket>();
         let (lan_output_sender, mut lan_output_receiver) =
             mpsc::unbounded_channel::<ServerPacket<SocketAddr>>();
 

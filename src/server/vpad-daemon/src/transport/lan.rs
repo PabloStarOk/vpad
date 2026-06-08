@@ -16,7 +16,7 @@ use tokio::{
 
 use crate::transport::{
     InputTransport,
-    models::{ClientId, Message, ServerMessage, ServerPacket, VpadPacket},
+    models::{ClientId, ClientMessage, ClientPacket, ServerMessage, ServerPacket},
 };
 
 pub struct LanInputTransport {
@@ -42,8 +42,8 @@ impl LanInputTransport {
         }
     }
 
-    async fn listen(&self, packet_sender: UnboundedSender<VpadPacket>) {
-        let mut data_buf = [0u8; Message::MAX_SIZE];
+    async fn listen(&self, packet_sender: UnboundedSender<ClientPacket>) {
+        let mut data_buf = [0u8; ClientMessage::MAX_SIZE];
         loop {
             let addr = match self.udp_socket.recv_from(&mut data_buf).await {
                 Ok((_, address)) => address,
@@ -55,7 +55,7 @@ impl LanInputTransport {
 
             trace!("Received UDP packet from {}.", addr.ip());
 
-            let message = match Message::try_from(&data_buf) {
+            let message = match ClientMessage::try_from(&data_buf) {
                 Ok(msg) => msg,
                 Err(error) => {
                     error!("Could not create message from data of UDP packet: {error}");
@@ -63,7 +63,7 @@ impl LanInputTransport {
                 }
             };
 
-            let packet = VpadPacket {
+            let packet = ClientPacket {
                 client_id: ClientId::Network(addr),
                 message,
             };
@@ -98,7 +98,7 @@ impl LanInputTransport {
 impl InputTransport<SocketAddr> for LanInputTransport {
     async fn run(
         &self,
-        packet_sender: UnboundedSender<VpadPacket>,
+        packet_sender: UnboundedSender<ClientPacket>,
         output_receiver: &mut UnboundedReceiver<ServerPacket<SocketAddr>>,
     ) {
         let socket_port = self

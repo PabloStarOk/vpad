@@ -2,7 +2,8 @@ use std::{collections::HashMap, net::SocketAddr};
 
 use crate::{
     transport::models::{
-        ClientId, ConnectionMessage, InputSignal, Message, ServerMessage, ServerPacket, VpadPacket,
+        ClientId, ClientMessage, ClientPacket, ConnectionMessage, InputSignal, ServerMessage,
+        ServerPacket,
     },
     virt::linux::LinuxVirtualGamepad,
 };
@@ -26,14 +27,14 @@ impl GamepadManager {
         }
     }
 
-    pub async fn run(&mut self, packet_receiver: &mut UnboundedReceiver<VpadPacket>) {
+    pub async fn run(&mut self, packet_receiver: &mut UnboundedReceiver<ClientPacket>) {
         while let Some(packet) = packet_receiver.recv().await {
             trace!("Received VPad packet: {:?}", packet);
             match packet.message {
-                Message::Connection(msg_type) => {
+                ClientMessage::Connection(msg_type) => {
                     self.handle_connection_msg(packet.client_id, msg_type)
                 }
-                Message::Input(signal) => match self.gamepads.get_mut(&packet.client_id) {
+                ClientMessage::Input(signal) => match self.gamepads.get_mut(&packet.client_id) {
                     Some(gamepad) => Self::try_report_input(gamepad, packet.client_id, signal),
                     None => trace!(
                         "Ignoring input received from unknown client {:?}",
