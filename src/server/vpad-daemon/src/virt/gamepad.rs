@@ -16,19 +16,24 @@ type VirtualGamepad = LinuxVirtualGamepad;
 
 pub struct GamepadManager {
     gamepads: HashMap<ClientId, VirtualGamepad>,
+    client_packet_rx: UnboundedReceiver<ClientPacket>,
     opt_lan_msg_sender: Option<UnboundedSender<ServerPacket<SocketAddr>>>,
 }
 
 impl GamepadManager {
-    pub fn new(lan_msg_sender: UnboundedSender<ServerPacket<SocketAddr>>) -> Self {
+    pub fn new(
+        client_packet_rx: UnboundedReceiver<ClientPacket>,
+        lan_msg_sender: UnboundedSender<ServerPacket<SocketAddr>>,
+    ) -> Self {
         GamepadManager {
             gamepads: HashMap::new(),
+            client_packet_rx,
             opt_lan_msg_sender: Option::Some(lan_msg_sender),
         }
     }
 
-    pub async fn run(&mut self, packet_receiver: &mut UnboundedReceiver<ClientPacket>) {
-        while let Some(packet) = packet_receiver.recv().await {
+    pub async fn run(&mut self) {
+        while let Some(packet) = self.client_packet_rx.recv().await {
             trace!("Received VPad packet: {:?}", packet);
             match packet.message {
                 ClientMessage::Connection(msg_type) => {

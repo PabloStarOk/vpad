@@ -26,19 +26,19 @@ impl Server {
         env_logger::init();
         let tk_handle = runtime::Handle::current();
 
-        let (input_sender, mut input_receiver) = mpsc::unbounded_channel::<ClientPacket>();
+        let (input_sender, client_packet_rx) = mpsc::unbounded_channel::<ClientPacket>();
         let (lan_output_sender, mut lan_output_receiver) =
             mpsc::unbounded_channel::<ServerPacket<SocketAddr>>();
 
         let lan_transport = LanTransport::new(tk_handle).await;
-        let mut gamepad_manager = GamepadManager::new(lan_output_sender);
+        let mut gamepad_manager = GamepadManager::new(client_packet_rx, lan_output_sender);
 
         info!("Server started successfully");
         select! {
             _ = lan_transport.run(input_sender, &mut lan_output_receiver) => {
                 error!("LAN transport stopped unexpectedly");
             },
-            _ = gamepad_manager.run(&mut input_receiver) => {
+            _ = gamepad_manager.run() => {
                 error!("Gamepad manager stopped unexpectedly");
             },
             _ = Self::wait_shutdown_signal() => {},
