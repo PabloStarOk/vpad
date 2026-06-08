@@ -1,6 +1,6 @@
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+use tokio::sync::mpsc::UnboundedReceiver;
 
-use crate::transport::models::{ClientPacket, ServerPacket};
+use crate::transport::models::ServerPacket;
 
 pub mod lan;
 pub mod models;
@@ -8,7 +8,6 @@ pub mod models;
 pub trait Transport<T>: Send {
     fn run(
         &self,
-        input_sender: UnboundedSender<ClientPacket>,
         output_receiver: &mut UnboundedReceiver<ServerPacket<T>>,
     ) -> impl Future<Output = ()>;
 

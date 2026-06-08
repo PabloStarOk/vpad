@@ -3,7 +3,7 @@ use std::{io::Result, net::SocketAddr};
 use log::{error, info};
 use tokio::{
     runtime, select,
-    sync::mpsc::{self, UnboundedReceiver, UnboundedSender},
+    sync::mpsc::{self, UnboundedReceiver},
 };
 
 use crate::{
@@ -18,7 +18,6 @@ use crate::{
 pub struct Server {
     lan_transport: LanTransport,
     gamepad_manager: GamepadManager,
-    client_packet_tx: UnboundedSender<ClientPacket>,
     lan_server_packet_rx: UnboundedReceiver<ServerPacket<SocketAddr>>,
 }
 
@@ -30,13 +29,12 @@ impl Server {
         let (lan_server_packet_tx, lan_server_packet_rx) =
             mpsc::unbounded_channel::<ServerPacket<SocketAddr>>();
 
-        let lan_transport = LanTransport::new(tk_handle).await;
+        let lan_transport = LanTransport::new(tk_handle, client_packet_tx.clone()).await;
         let gamepad_manager = GamepadManager::new(client_packet_rx, lan_server_packet_tx);
 
         Server {
             lan_transport,
             gamepad_manager,
-            client_packet_tx,
             lan_server_packet_rx,
         }
     }
@@ -46,7 +44,7 @@ impl Server {
 
         info!("Server started successfully");
         select! {
-            _ = self.lan_transport.run(self.client_packet_tx.clone(), &mut self.lan_server_packet_rx) => {
+            _ = self.lan_transport.run(&mut self.lan_server_packet_rx) => {
                 error!("LAN transport stopped unexpectedly");
             },
             _ = self.gamepad_manager.run() => {

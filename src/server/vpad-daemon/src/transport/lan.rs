@@ -22,6 +22,7 @@ use crate::transport::{
 pub struct LanTransport {
     tk_handle: Handle,
     udp_socket: UdpSocket,
+    client_packet_tx: UnboundedSender<ClientPacket>,
 }
 
 impl LanTransport {
@@ -32,17 +33,18 @@ impl LanTransport {
     const SERVICE_NAME: &str = "VpadServer";
     const SHUTDOWN_TIMEOUT_MS: Duration = Duration::from_millis(5000);
 
-    pub async fn new(tk_handle: Handle) -> Self {
+    pub async fn new(tk_handle: Handle, client_packet_tx: UnboundedSender<ClientPacket>) -> Self {
         let udp_socket = UdpSocket::bind(Self::SOCKET_ADDR)
             .await
             .expect("Could not bind UDP socket to the specified socket address.");
         LanTransport {
             tk_handle,
             udp_socket,
+            client_packet_tx,
         }
     }
 
-    async fn listen(&self, packet_sender: UnboundedSender<ClientPacket>) {
+    async fn listen(&self) {
         let mut data_buf = [0u8; ClientMessage::MAX_SIZE];
         loop {
             let addr = match self.udp_socket.recv_from(&mut data_buf).await {
@@ -67,7 +69,7 @@ impl LanTransport {
                 client_id: ClientId::Network(addr),
                 message,
             };
-            packet_sender
+            self.client_packet_tx
                 .send(packet)
                 .expect("Could not send message on the unbounded channel.");
         }
@@ -96,11 +98,7 @@ impl LanTransport {
 }
 
 impl Transport<SocketAddr> for LanTransport {
-    async fn run(
-        &self,
-        packet_sender: UnboundedSender<ClientPacket>,
-        output_receiver: &mut UnboundedReceiver<ServerPacket<SocketAddr>>,
-    ) {
+    async fn run(&self, output_receiver: &mut UnboundedReceiver<ServerPacket<SocketAddr>>) {
         let socket_port = self
             .udp_socket
             .local_addr()
@@ -113,7 +111,7 @@ impl Transport<SocketAddr> for LanTransport {
         let _dmns_service =
             responder.register(Self::SERVICE_DOMAIN, Self::SERVICE_NAME, socket_port, &[]);
 
-        join!(self.listen(packet_sender), self.send(output_receiver));
+        join!(self.listen(), self.send(output_receiver));
     }
 
     /// Shutdowns LAN transport flushing all buffered Shutdown messages.
