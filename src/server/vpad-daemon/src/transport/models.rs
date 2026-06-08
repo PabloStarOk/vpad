@@ -1,7 +1,7 @@
 use std::{
     error::Error,
     fmt::{Display, Formatter},
-    net::IpAddr,
+    net::SocketAddr,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -182,7 +182,7 @@ impl TryFrom<u8> for ConnectionMessage {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ClientId {
-    Network(IpAddr),
+    Network(SocketAddr),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -238,4 +238,16 @@ impl TryFrom<&[u8; Self::MAX_SIZE]> for Message {
 pub struct VpadPacket {
     pub client_id: ClientId,
     pub message: Message,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum ServerMessage {
+    Shutdown,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ServerPacket<T> {
+    pub client_id: T,
+    pub message: ServerMessage,
 }

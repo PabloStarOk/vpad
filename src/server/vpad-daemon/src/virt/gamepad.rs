@@ -1,24 +1,28 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, net::SocketAddr};
 
 use crate::{
-    transport::models::{ClientId, ConnectionMessage, InputSignal, Message, VpadPacket},
+    transport::models::{
+        ClientId, ConnectionMessage, InputSignal, Message, ServerMessage, ServerPacket, VpadPacket,
+    },
     virt::linux::LinuxVirtualGamepad,
 };
 
 use log::{debug, error, info, trace};
-use tokio::sync::mpsc::UnboundedReceiver;
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 #[cfg(target_os = "linux")]
 type VirtualGamepad = LinuxVirtualGamepad;
 
 pub struct GamepadManager {
     gamepads: HashMap<ClientId, VirtualGamepad>,
+    opt_lan_msg_sender: Option<UnboundedSender<ServerPacket<SocketAddr>>>,
 }
 
 impl GamepadManager {
-    pub fn new() -> Self {
+    pub fn new(lan_msg_sender: UnboundedSender<ServerPacket<SocketAddr>>) -> Self {
         GamepadManager {
             gamepads: HashMap::new(),
+            opt_lan_msg_sender: Option::Some(lan_msg_sender),
         }
     }
 
@@ -38,6 +42,30 @@ impl GamepadManager {
                 },
             }
         }
+    }
+
+    pub fn shutdown(&mut self) {
+        let Some(lan_msg_sender) = &self.opt_lan_msg_sender else {
+            return;
+        };
+
+        self.gamepads.drain().for_each(|(id, _)| {
+            let result = match id {
+                ClientId::Network(addr) => lan_msg_sender.send(ServerPacket {
+                    client_id: addr,
+                    message: ServerMessage::Shutdown,
+                }),
+            };
+
+            if let Err(error) = result {
+                error!(
+                    "Could not send shutdown message to client '{:?}' | Error: {}",
+                    id, error
+                );
+            };
+        });
+
+        self.opt_lan_msg_sender = None;
     }
 
     fn handle_connection_msg(&mut self, client_id: ClientId, msg: ConnectionMessage) {
