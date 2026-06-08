@@ -15,16 +15,16 @@ use tokio::{
 };
 
 use crate::transport::{
-    InputTransport,
+    Transport,
     models::{ClientId, ClientMessage, ClientPacket, ServerMessage, ServerPacket},
 };
 
-pub struct LanInputTransport {
+pub struct LanTransport {
     tk_handle: Handle,
     udp_socket: UdpSocket,
 }
 
-impl LanInputTransport {
+impl LanTransport {
     const HOST_ADDR: Ipv4Addr = Ipv4Addr::new(0, 0, 0, 0);
     const HOST_PORT: u16 = 0;
     const SOCKET_ADDR: SocketAddrV4 = SocketAddrV4::new(Self::HOST_ADDR, Self::HOST_PORT);
@@ -36,7 +36,7 @@ impl LanInputTransport {
         let udp_socket = UdpSocket::bind(Self::SOCKET_ADDR)
             .await
             .expect("Could not bind UDP socket to the specified socket address.");
-        LanInputTransport {
+        LanTransport {
             tk_handle,
             udp_socket,
         }
@@ -95,7 +95,7 @@ impl LanInputTransport {
     }
 }
 
-impl InputTransport<SocketAddr> for LanInputTransport {
+impl Transport<SocketAddr> for LanTransport {
     async fn run(
         &self,
         packet_sender: UnboundedSender<ClientPacket>,
@@ -116,7 +116,7 @@ impl InputTransport<SocketAddr> for LanInputTransport {
         join!(self.listen(packet_sender), self.send(output_receiver));
     }
 
-    /// Shutdowns LAN input transport flushing all buffered Shutdown messages.
+    /// Shutdowns LAN transport flushing all buffered Shutdown messages.
     /// The channel must be closed for this to work properly.
     async fn shutdown(&self, output_receiver: &mut UnboundedReceiver<ServerPacket<SocketAddr>>) {
         let timeout = time::timeout(Self::SHUTDOWN_TIMEOUT_MS, self.send(output_receiver));
@@ -124,6 +124,6 @@ impl InputTransport<SocketAddr> for LanInputTransport {
             warn!("Could not send buffered server messages to clients due to a timeout");
         }
 
-        debug!("LAN Input transport stopped")
+        debug!("LAN transport stopped")
     }
 }

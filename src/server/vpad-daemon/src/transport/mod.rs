@@ -5,7 +5,7 @@ use crate::transport::models::{ClientPacket, ServerPacket};
 pub mod lan;
 pub mod models;
 
-pub trait InputTransport<T>: Send {
+pub trait Transport<T>: Send {
     fn run(
         &self,
         input_sender: UnboundedSender<ClientPacket>,

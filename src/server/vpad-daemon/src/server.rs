@@ -8,8 +8,8 @@ use tokio::{
 
 use crate::{
     transport::{
-        InputTransport,
-        lan::LanInputTransport,
+        Transport,
+        lan::LanTransport,
         models::{ClientPacket, ServerPacket},
     },
     virt::gamepad::GamepadManager,
@@ -30,13 +30,13 @@ impl Server {
         let (lan_output_sender, mut lan_output_receiver) =
             mpsc::unbounded_channel::<ServerPacket<SocketAddr>>();
 
-        let lan_transport = LanInputTransport::new(tk_handle).await;
+        let lan_transport = LanTransport::new(tk_handle).await;
         let mut gamepad_manager = GamepadManager::new(lan_output_sender);
 
         info!("Server started successfully");
         select! {
             _ = lan_transport.run(input_sender, &mut lan_output_receiver) => {
-                error!("LAN input transport stopped unexpectedly");
+                error!("LAN transport stopped unexpectedly");
             },
             _ = gamepad_manager.run(&mut input_receiver) => {
                 error!("Gamepad manager stopped unexpectedly");
@@ -79,7 +79,7 @@ impl Server {
     async fn shutdown(
         &self,
         gamepad_manager: &mut GamepadManager,
-        lan_transport: &LanInputTransport,
+        lan_transport: &LanTransport,
         lan_output_receiver: &mut UnboundedReceiver<ServerPacket<SocketAddr>>,
     ) {
         info!("Shutting down server");
