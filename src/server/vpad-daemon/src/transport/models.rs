@@ -190,6 +190,7 @@ pub enum MessageError {
     InvalidType,
     InvalidConnectionMsg,
     InvalidInputSignal(InputSignalError),
+    InvalidSize,
 }
 
 impl Display for MessageError {
@@ -198,6 +199,7 @@ impl Display for MessageError {
             Self::InvalidType => write!(formatter, "Invalid message type"),
             Self::InvalidConnectionMsg => write!(formatter, "Invalid connection message"),
             Self::InvalidInputSignal(error) => write!(formatter, "{error}"),
+            Self::InvalidSize => write!(formatter, "Invalid message size"),
         }
     }
 }
@@ -209,26 +211,30 @@ pub enum ClientMessage {
 }
 
 impl ClientMessage {
-    /// Max buffer size: 1 (msg_type) + 1 (input_type) + 1 (code) + 2 (X axis) + 2 (Y axis) = 7
+    /// Max buffer size: 1 (msg_type) + 1 (input_type | connection_type) + 1 (code) + 2 (X axis) + 2 (Y axis) = 7
     pub const MAX_SIZE: usize = 7;
+    pub const MIN_SIZE: usize = 2;
     pub const CONNECTION: u8 = 0;
     pub const INPUT: u8 = 1;
 }
 
-impl TryFrom<&[u8; Self::MAX_SIZE]> for ClientMessage {
+impl TryFrom<&[u8]> for ClientMessage {
     type Error = MessageError;
 
-    fn try_from(buffer: &[u8; Self::MAX_SIZE]) -> Result<Self, Self::Error> {
+    fn try_from(buffer: &[u8]) -> Result<Self, Self::Error> {
+        let buf_length = buffer.len();
+        if buf_length < Self::MIN_SIZE || buf_length > Self::MAX_SIZE {
+            return Err(MessageError::InvalidSize);
+        }
+
         let type_byte = buffer[0];
         match type_byte {
-            Self::CONNECTION => match ConnectionMessage::try_from(buffer[1]) {
-                Ok(conn_msg) => Ok(Self::Connection(conn_msg)),
-                Err(_) => return Err(MessageError::InvalidConnectionMsg),
-            },
-            Self::INPUT => match InputSignal::try_from(&buffer[1..Self::MAX_SIZE]) {
-                Ok(signal) => Ok(Self::Input(signal)),
-                Err(error) => return Err(MessageError::InvalidInputSignal(error)),
-            },
+            Self::CONNECTION => ConnectionMessage::try_from(buffer[1])
+                .map(Self::Connection)
+                .map_err(|_| MessageError::InvalidConnectionMsg),
+            Self::INPUT => InputSignal::try_from(&buffer[1..])
+                .map(Self::Input)
+                .map_err(MessageError::InvalidInputSignal),
             _ => Err(MessageError::InvalidType),
         }
     }

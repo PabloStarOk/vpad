@@ -47,8 +47,8 @@ impl LanTransport {
     async fn listen(&self) {
         let mut data_buf = [0u8; ClientMessage::MAX_SIZE];
         loop {
-            let addr = match self.udp_socket.recv_from(&mut data_buf).await {
-                Ok((_, address)) => address,
+            let (bytes_read, addr) = match self.udp_socket.recv_from(&mut data_buf).await {
+                Ok((size, address)) => (size, address),
                 Err(error) => {
                     error!("Could not read data of UDP packet: {error}");
                     continue;
@@ -57,7 +57,7 @@ impl LanTransport {
 
             trace!("Received UDP packet from {}.", addr.ip());
 
-            let message = match ClientMessage::try_from(&data_buf) {
+            let message = match ClientMessage::try_from(&data_buf[..bytes_read]) {
                 Ok(msg) => msg,
                 Err(error) => {
                     error!("Could not create message from data of UDP packet: {error}");
