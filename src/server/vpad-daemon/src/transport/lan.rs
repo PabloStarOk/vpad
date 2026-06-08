@@ -69,9 +69,13 @@ impl LanTransport {
                 client_id: ClientId::Network(addr),
                 message,
             };
-            self.client_packet_tx
-                .send(packet)
-                .expect("Could not send message on the unbounded channel.");
+
+            if self.client_packet_tx.send(packet).is_err() {
+                error!(
+                    "Could not send client packet in the channel because it is closed: {:?}",
+                    packet
+                );
+            }
         }
     }
 
